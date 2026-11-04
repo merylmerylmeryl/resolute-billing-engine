@@ -1,3 +1,65 @@
+# Lone Oak Billing Engine: project rules
+
+- Spec: `docs/case-study.md`
+- Schema: `docs/schema.md`
+- Decisions: `docs/DECISIONS.md`
+
+## How we work
+
+- Plan before writing code. Show me the plan and wait for my approval.
+- Keep changes small. One step at a time.
+- Write Pest tests first from the spec's expected results, then build until they pass.
+- Run `php artisan test` after every change. Never say something works without running the tests.
+- Before each commit, run the `billing-reviewer` agent and fix what it finds.
+- Explain anything non-obvious so I can explain it in the live session.
+- Use Laravel the normal way (Eloquent, migrations, Artisan commands, form requests, Blade). No extra packages unless I approve.
+
+## Money
+
+- Never use floats for money. Use exact decimal math (bcmath) everywhere.
+- Store money as DECIMAL columns.
+- Do all math without rounding, then round each property's fee to the cent, rounding halves up ($69.375 → $69.38).
+- Fee order: savings → fee % → round → $10 waiver → $2,500 cap.
+
+## Tax
+
+- Order: homestead exemption → tax per jurisdiction (taxable value / 100 × rate) → sum → savings.
+- Savings = tax at noticed value − tax at final value.
+- Taxable value can't go below $0.
+- Jurisdiction rates and exemptions are data (table + seeder), not hardcoded.
+- Exemption types: none, flat (subtract an amount), percent (subtract a percentage).
+
+## Fee rules
+
+- 30% of savings, or 25% if the client has 3+ properties enrolled that season, whatever their outcomes (pending counts).
+- The rate is decided at billing time; already-billed lines are not re-rated.
+- Savings zero or negative → $0.
+- Fee under $10 after rounding → waived, $0.
+- Max $2,500 per property.
+
+## Events and billing
+
+- Events are the only way outcomes reach billing. They are append-only, never edited.
+- Latest event per property, recorded on or before the billing date, wins. Same date: the one recorded last wins.
+- Imported events are de-duplicated by `source_id`. Form events have a null `source_id`.
+- Clients and properties keep their source IDs as `external_id` (unique). Re-imports update, never duplicate.
+- A billing run bills every property whose latest outcome is final and not yet billed. Pending properties are skipped.
+- Each invoice line stores the `event_id` it billed. If a property's latest final event is already on a line, skip it.
+- If a property was billed for an older event and now has a newer final event, issue an adjustment for the fee difference.
+- Each client gets one regular invoice per run, one line per property. $0 invoices are still issued.
+- Adjustments are invoices with `type = adjustment`. Each adjustment line sets `adjusts_line_id` to the line it corrects.
+- On adjustment lines, `fee` is the property's new total fee and `amount` is the difference.
+- Issued invoices and lines are never updated or deleted.
+- Running billing twice with no new information creates nothing new.
+- Each invoice line stores a snapshot (noticed value, final value, savings, fee rate, fee, per-jurisdiction breakdown) so every charge can be explained.
+
+## Code structure
+
+- Keep the fee/tax calculator in its own class, separate from commands and controllers.
+- Import command takes a file path argument, so any data file can be loaded.
+- Billing command takes an "as of" date argument.
+- Keep Blade pages plain: a client list, and a client page with invoices, adjustments and line breakdowns.
+
 <laravel-boost-guidelines>
 === foundation rules ===
 
