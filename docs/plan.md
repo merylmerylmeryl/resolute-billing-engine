@@ -67,7 +67,7 @@ $212.88 -> $266.10 (+$53.22) -> $240.00 must give **-$26.10**, not +$27.12.
 ## D. Traps found by testing them
 
 - **SQLite has no true DECIMAL.** `decimal(12,2)` stores a REAL: 69.38 comes back as a PHP double, and summing 0.1 + 0.2 gives 0.30000000000000004.
-  - Use `decimal:2` casts on every money attribute (these return strings)
+  - Use decimal:2 casts only on stored money columns (values, savings, fee, amount, total). Rates and exemption_amount use decimal:4. Exact unrounded savings and taxes stay in the calculator and in the breakdown JSON as strings. Never calculate a fee from the stored, rounded savings column.
   - Never use SQL `SUM` / `withSum` on money
   - Total with `bcadd` in PHP, and keep JSON values as strings
 - **Date boundary bug.** Laravel stores dates as `2026-07-01 00:00:00`, and SQLite says that is not `<= '2026-07-01'`. A plain `where` would drop events recorded exactly on the as-of date. Use `whereDate` and test the boundary.
