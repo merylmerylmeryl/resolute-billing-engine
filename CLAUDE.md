@@ -20,6 +20,9 @@
 - Store money as DECIMAL columns.
 - Do all math without rounding, then round each property's fee to the cent, rounding halves up ($69.375 → $69.38).
 - Fee order: savings → fee % → round → $10 waiver → $2,500 cap.
+- bcmath truncates and defaults to 0 decimal places, so always pass a scale. Because it truncates toward zero, round with `bcadd($x, '0.005', 2)` for positive values and `bcsub($x, '0.005', 2)` for negative ones. Fees are never negative, but the `savings` snapshot can be.
+- SQLite stores DECIMAL as REAL. Use `decimal:2` casts on stored money and `decimal:4` on rates and `exemption_amount`. Never use SQL `SUM` or `withSum` on money; total with `bcadd` in PHP. Keep JSON values as strings.
+- Never calculate a fee from the stored, rounded `savings` column.
 
 ## Tax
 
@@ -31,27 +34,42 @@
 
 ## Fee rules
 
+- A season is the year of an event's `recorded_at`.
 - 30% of savings, or 25% if the client has 3+ properties enrolled that season, whatever their outcomes (pending counts).
+- A property is enrolled in a season if it has at least one event in that season, recorded on or before the billing date.
 - The rate is decided at billing time; already-billed lines are not re-rated.
+- An adjustment reuses the `fee_rate` of the line it corrects, so the difference reflects only the outcome change.
 - Savings zero or negative → $0.
 - Fee under $10 after rounding → waived, $0.
-- Max $2,500 per property.
+- Max $2,500 per property per season.
 
 ## Events and billing
 
 - Events are the only way outcomes reach billing. They are append-only, never edited.
-- Latest event per property, recorded on or before the billing date, wins. Same date: the one recorded last wins.
+- Latest event, billed-or-not and the fee tier all apply per property and season.
+- Latest event per property and season, recorded on or before the billing date, wins. Same date: the one recorded last (highest `id`) wins. Filter dates with `whereDate`, because a plain `where` drops events recorded exactly on the billing date.
 - Imported events are de-duplicated by `source_id`. Form events have a null `source_id`.
 - Clients and properties keep their source IDs as `external_id` (unique). Re-imports update, never duplicate.
 - A billing run bills every property whose latest outcome is final and not yet billed. Pending properties are skipped.
 - Each invoice line stores the `event_id` it billed. If a property's latest final event is already on a line, skip it.
-- If a property was billed for an older event and now has a newer final event, issue an adjustment for the fee difference.
-- Each client gets one regular invoice per run, one line per property. $0 invoices are still issued.
-- Adjustments are invoices with `type = adjustment`. Each adjustment line sets `adjusts_line_id` to the line it corrects.
-- On adjustment lines, `fee` is the property's new total fee and `amount` is the difference.
+- If a property was billed for an older event in the same season and now has a newer final event, issue an adjustment for the fee difference. If the fee is unchanged, issue nothing.
+- A backdated event or an older billing date never un-bills anything. If the eligible event isn't newer than the last billed one by (`recorded_at`, `id`), skip it.
+- Each client with new regular lines gets one regular invoice per run, one line per property per season. An invoice that totals $0 is still issued. A client with no new regular lines, such as one whose properties are all pending or already billed, gets no regular invoice.
+- Adjustments are invoices with `type = adjustment`. Each adjustment line sets `adjusts_line_id` to the property's original line for that season.
+- On adjustment lines, `fee` is the property's new total fee and `amount` is the difference from the latest line's fee. A client with new and revised properties in one run gets one invoice and one adjustment. An adjustment's total can be negative.
 - Issued invoices and lines are never updated or deleted.
-- Running billing twice with no new information creates nothing new.
+- Running billing twice with no new information creates nothing new. A run that issues nothing creates no `runs` row.
 - Each invoice line stores a snapshot (noticed value, final value, savings, fee rate, fee, per-jurisdiction breakdown) so every charge can be explained.
+
+## Import and form
+
+- Import keeps file order and never sorts, because "recorded last" depends on `id`.
+- Unreadable JSON or a missing top-level key aborts the import.
+- A bad row (unknown property or jurisdiction, final with no value, pending with a value, invalid status or date, non-numeric value, missing field) is skipped and reported, valid rows still load, and the command exits non-zero.
+- A repeated `source_id` with different values: the first one wins, with a warning.
+- Re-importing changed homestead or jurisdiction data affects future calculations only and triggers no adjustment, with one exception: a revision that didn't change the fee never landed on a line, so the next run recalculates it with the new data. If the fee now differs, that run issues one adjustment.
+- Form: `recorded_at` can't be in the future, money has at most 2 decimals, and final value may exceed noticed (savings go negative, fee is $0). If noticed values differ across events, the latest event's value is used.
+- No authentication, since the spec doesn't ask for it.
 
 ## Code structure
 

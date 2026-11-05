@@ -14,7 +14,7 @@ All spec numbers were checked by hand with bcmath before any code was written (s
 
 | # | Question | Decision |
 |---|---|---|
-| A1 | Multi-year data | Latest-event-wins, billed-or-not, and the 25% tier all apply per (property, year of `recorded_at`). No schema change: a line's season comes from its event. |
+| A1 | Multi-year data | Latest-event-wins, billed-or-not, the 25% tier and the $2,500 cap all apply per (property, year of `recorded_at`). No schema change: a line's season comes from its event. |
 | A2 | What "enrolled" means | A property counts if it has at least one event in that season, recorded on or before the as-of date. |
 | A3 | Which rate an adjustment uses | The adjustment reuses the `fee_rate` of the line it corrects, so the difference reflects only the outcome change. |
 | A4 | A revision that doesn't change the fee | No adjustment. The $0 rule applies to regular invoices only. |
@@ -35,7 +35,7 @@ Savings of $1,000 billed at 30% = $300, later revised to $1,100:
 - Move to 25%: $275, so **-$25** credit even though savings went up
 
 ### A4 consequence
-That event never lands on a line, so each run re-evaluates it and gets $0 again. Harmless and still idempotent. Covered by a test.
+That event never lands on a line, so each run re-evaluates it and gets $0 again, unless a re-import has changed the data (see the exception in E). Still idempotent when there's no new information. Covered by a test.
 
 ### A5 example
 $212.88 -> $266.10 (+$53.22) -> $240.00 must give **-$26.10**, not +$27.12.
@@ -47,7 +47,7 @@ $212.88 -> $266.10 (+$53.22) -> $240.00 must give **-$26.10**, not +$27.12.
 | Change | Why |
 |---|---|
 | `invoice_lines.event_id` unique | Database-level backstop against double billing: an event can be billed at most once. |
-| `invoices` unique (`run_id`, `client_id`, `type`) and `invoice_lines` unique (`invoice_id`, `property_id`) | Enforces "one per client per run" and "one line per property". |
+| `invoices` unique (`run_id`, `client_id`, `type`) | Enforces "one per client per run". One line per property per season on each invoice is enforced in code and tested, because a property with unbilled events in two seasons needs two lines on one invoice. |
 | `exemption_amount` as `decimal(12,4)` | `12,2` fits 0.20 but would silently round a 0.125 exemption to 0.13. |
 | Add to `breakdown` JSON: exact savings, fee before waiver/cap, a note (waived / capped / no_savings), and rate, exemption and taxable values per jurisdiction | `savings (12,2)` is rounded, so it can't always reproduce the fee. There's nowhere else to record "waived", and rates may change later. No new columns needed. |
 | Foreign keys use `restrictOnDelete` | No cascade may ever remove issued lines. |
@@ -71,7 +71,7 @@ $212.88 -> $266.10 (+$53.22) -> $240.00 must give **-$26.10**, not +$27.12.
   - Never use SQL `SUM` / `withSum` on money
   - Total with `bcadd` in PHP, and keep JSON values as strings
 - **Date boundary bug.** Laravel stores dates as `2026-07-01 00:00:00`, and SQLite says that is not `<= '2026-07-01'`. A plain `where` would drop events recorded exactly on the as-of date. Use `whereDate` and test the boundary.
-- **bcmath truncates and defaults to 0 decimal places.** Always pass a scale. Round with `bcadd($x, '0.005', 2)`, which is correct because rounding only happens on positive values.
+- **bcmath truncates and defaults to 0 decimal places.** Always pass a scale. Round with `bcadd($x, '0.005', 2)`, or `bcsub` for negative values. Fees are never negative, but the `savings` snapshot can be, for example -1.843155 -> -1.84.
   - 9.995 -> 10.00 (not waived)
   - 9.994999 -> 9.99 (waived)
 - **The sample data can't prove some rules.** P5 is waived at both 30% ($7.52) and 25% ($6.27), and no sample client reaches 3 properties with one pending. "Pending counts" needs its own test.
@@ -85,9 +85,9 @@ $212.88 -> $266.10 (+$53.22) -> $240.00 must give **-$26.10**, not +$27.12.
 - A client with only pending properties gets no invoice. A $0 invoice needs at least one line.
 - A client with both new and revised properties in one run gets one invoice and one adjustment. A mixed adjustment's total can be negative.
 - A backdated event, or a run with an older as-of date, never un-bills anything. If the eligible event isn't newer than the last billed one by (`recorded_at`, `id`), skip it.
-- **Import:** unreadable JSON or a missing top-level key aborts. A bad row (unknown property or jurisdiction, final with no value, pending with a value) is skipped and reported, and the command exits non-zero, so one bad row doesn't block the rest.
+- **Import:** unreadable JSON or a missing top-level key aborts. A bad row (unknown property or jurisdiction, final with no value, pending with a value, invalid status or date, non-numeric value, missing field) is skipped and reported, and the command exits non-zero, so one bad row doesn't block the rest.
 - A repeated `source_id` with different values: the first one wins, with a warning.
-- Re-importing changed homestead or jurisdiction data affects future calculations only and triggers no adjustment.
+- Re-importing changed homestead or jurisdiction data affects future calculations only and triggers no adjustment, with one exception: a revision that didn't change the fee never landed on a line (A4), so the next run recalculates it with the new data and issues one adjustment if the fee now differs.
 - **Form:** `recorded_at` can't be in the future, money has at most 2 decimals, and final value may exceed noticed (savings go negative, fee is $0). If noticed values differ across events, the latest event's value is used.
 - No authentication, since the spec doesn't ask for it. Listed under "what I'd do next".
 
@@ -198,6 +198,7 @@ if anything was built: create the Run, then invoices with totals, then lines
 - **Events:**
   - An event recorded exactly on the as-of date counts; the next day doesn't
   - Same-date events: highest id wins
+  - Two unbilled final events in one season -> one line, for the latest
   - Pending -> final gets billed later
   - Final -> pending after billing keeps the bill, then adjusts once final again
   - A backdated event changes nothing
@@ -206,10 +207,10 @@ if anything was built: create the Run, then invoices with totals, then lines
   - Credit (negative)
   - Second revision measured against the latest fee
   - $0 -> charge (waived, then above $10)
-  - Unchanged fee -> nothing (A4)
+  - Unchanged fee -> nothing (A4); after a re-import that changes the fee -> one adjustment, then nothing
   - Several revisions -> one adjustment, one line each
   - Invoice and adjustment in the same run
-- **Multi-year (A1):** a second-year final event is a new bill with its own tier count.
+- **Multi-year (A1):** a second-year final event is a new bill with its own tier count. A property with unbilled events in two seasons gets two lines on one invoice. The $2,500 cap applies in each season.
 
 ### Step 6: Blade pages
 
