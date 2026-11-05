@@ -79,6 +79,7 @@
 - Import command takes a file path argument, so any data file can be loaded.
 - Billing command takes an "as of" date argument.
 - Keep Blade pages plain: a client list, and a client page with invoices, adjustments and line breakdowns.
+- CSS: use meaningful class names (like col-rate, line-header). No nth-child or position-based selectors.
 
 <laravel-boost-guidelines>
 === foundation rules ===

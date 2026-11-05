@@ -16,6 +16,7 @@
 
         table { border-collapse: collapse; margin: 0.2rem 0 0.5rem; width: 100%; font-size: 0.9rem; }
         th, td { padding: 0.15rem 0.5rem; text-align: left; vertical-align: top; }
+        tr td:first-child { padding-left: 0; }
         th { color: #6b7280; font-weight: 600; white-space: nowrap; }
         .num { text-align: right; white-space: nowrap; }
         .list-table tr { border-bottom: 1px solid #eef0f2; }
@@ -66,10 +67,23 @@
         .tax-col-jurisdiction { padding-left: 0; }
         .tax-col-rate, .tax-col-amount { text-align: right; white-space: nowrap; }
         .tax-table th { border-bottom: 1px solid #eee; }
+
+        /* Event form */
+        .event-form { max-width: 480px; }
+        .form-row { margin-bottom: 0.9rem; }
+        .form-row label { display: block; font-size: 0.85rem; font-weight: 600; color: #6b7280; margin-bottom: 0.2rem; }
+        .form-row input, .form-row select { width: 100%; box-sizing: border-box; font: inherit; padding: 0.4rem 0.5rem; border: 1px solid #d1d5db; border-radius: 6px; background: #fff; color: inherit; }
+        .form-hint { font-size: 0.78rem; color: #6b7280; margin-top: 0.15rem; }
+        .field-error { font-size: 0.85rem; color: #b42318; margin-top: 0.2rem; }
+        .form-submit { font: inherit; font-weight: 600; padding: 0.45rem 1rem; border: 0; border-radius: 6px; background: #2563eb; color: #fff; cursor: pointer; }
+        .status-message { background: #e6f4ea; color: #1a7f37; border-radius: 6px; padding: 0.5rem 0.75rem; margin: 0.75rem 0; font-size: 0.9rem; }
     </style>
 </head>
 <body>
-    <nav><a href="{{ route('clients.index') }}">Clients</a></nav>
+    <nav><a href="{{ route('clients.index') }}">Clients</a><a href="{{ route('events.create') }}">Record event</a></nav>
+    @if (session('status'))
+        <div class="status-message">{{ session('status') }}</div>
+    @endif
     @yield('content')
 </body>
 </html>
