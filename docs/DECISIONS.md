@@ -32,7 +32,7 @@
 - Each invoice line records the event it billed, so a run can tell whether a property's latest outcome is new, changed, or already billed. That's what makes billing safe to run twice
 - Clients and properties keep their source IDs as external_id (unique), so re-imports update instead of duplicating, and pages show the IDs the business already uses
 - Jurisdiction rates and exemptions are stored as data, not hardcoded, since they change yearly
-- The database backs up the rules: an event can be on only one line (`event_id` unique), one invoice per client, type and run, one line per property per invoice, and foreign keys restrict deletes so no cascade can remove an issued line
+- The database backs up the rules: an event can be on only one line (`event_id` unique), one invoice per client, type and run, and foreign keys restrict deletes so no cascade can remove an issued line
 - `exemption_amount` has 4 decimals so a 0.125 exemption isn't rounded to 0.13. The line's breakdown also keeps the exact savings, the fee before the waiver and cap, a note (waived, capped, no savings), and each jurisdiction's rate, exemption and taxable value, since rates may change later
 - Dates are stored as `2026-07-01 00:00:00`, which SQLite says is not `<= '2026-07-01'`, so queries use `whereDate` to keep events recorded exactly on the billing date
 - Re-import after a no-change revision can issue one adjustment; documented, not fixed.
