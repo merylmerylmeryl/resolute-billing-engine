@@ -11,6 +11,7 @@
 - Write Pest tests first from the spec's expected results, then build until they pass.
 - Run `php artisan test` after every change. Never say something works without running the tests.
 - Before each commit, run the `billing-reviewer` agent and fix what it finds.
+- Commit directly to main.
 - Explain anything non-obvious so I can explain it in the live session.
 - Use Laravel the normal way (Eloquent, migrations, Artisan commands, form requests, Blade). No extra packages unless I approve.
 
