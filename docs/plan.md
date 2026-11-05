@@ -85,7 +85,7 @@ $212.88 -> $266.10 (+$53.22) -> $240.00 must give **-$26.10**, not +$27.12.
 - A client with only pending properties gets no invoice. A $0 invoice needs at least one line.
 - A client with both new and revised properties in one run gets one invoice and one adjustment. A mixed adjustment's total can be negative.
 - A backdated event, or a run with an older as-of date, never un-bills anything. If the eligible event isn't newer than the last billed one by (`recorded_at`, `id`), skip it.
-- **Import:** unreadable JSON or a missing top-level key aborts. A bad row (unknown property or jurisdiction, final with no value, pending with a value, invalid status or date, non-numeric value, missing field) is skipped and reported, and the command exits non-zero, so one bad row doesn't block the rest.
+- **Import:** unreadable JSON or a missing top-level key aborts. A bad row (unknown property or jurisdiction, final with no value, pending with a value, invalid status or date, non-numeric value, missing field, or a property row that moves the property to a different client) is skipped and reported, and the command exits non-zero, so one bad row doesn't block the rest.
 - A repeated `source_id` with different values: the first one wins, with a warning.
 - Re-importing changed homestead or jurisdiction data affects future calculations only and triggers no adjustment, with one exception: a revision that didn't change the fee never landed on a line (A4), so the next run recalculates it with the new data and issues one adjustment if the fee now differs.
 - **Form:** `recorded_at` can't be in the future, money has at most 2 decimals, and final value may exceed noticed (savings go negative, fee is $0). If noticed values differ across events, the latest event's value is used.
@@ -156,7 +156,7 @@ Apply the decisions above to CLAUDE.md, `docs/schema.md` and `docs/DECISIONS.md`
 
 `billing:import {path}`, with logic in `app/Billing/DataImporter.php`. Sample data lives at `database/data/sample.json`, and the tests use the same file.
 
-- Clients and properties: `updateOrCreate` on `external_id`
+- Clients and properties: `updateOrCreate` on `external_id`. Check the client first: a property row that names a different client is skipped whole
 - Jurisdictions: sync
 - Events: create only if `source_id` is new
 - Convert JSON numbers to strings here, the one place floats can enter
@@ -166,6 +166,7 @@ Apply the decisions above to CLAUDE.md, `docs/schema.md` and `docs/DECISIONS.md`
 - Sample loads: 3 clients, 6 properties, 7 events
 - Re-import creates nothing
 - Changed property data updates
+- A row that moves a property to a different client is reported as a bad row, and the property keeps its original client
 - Same-date events keep file order
 - Missing or malformed file fails cleanly
 - Each bad-row type is reported and valid rows still load
@@ -219,7 +220,7 @@ if anything was built: create the Run, then invoices with totals, then lines
 - **Client list:** ID, property count, invoice count, paginated. Totals are not summed in SQL.
 - **Client page:** each invoice or adjustment with its as-of date and total. Each line shows property, source event, noticed and final values, savings, rate, calculated fee, final fee with its note, and amount. A per-jurisdiction table explains the tax. Adjustments link to the original invoice and show previous fee -> new fee. Properties not yet billed are listed too.
 
-**Tests:** the pages render C1's 212.88 and +53.22, "waived" for P5, capped for P3, the link to the original invoice, and a 404 for an unknown client.
+**Tests:** the pages render C1's 212.88 and +53.22, "waived" for P5, capped for P3, the link to the original invoice, and a 404 for an unknown client. Update `tests/Feature/ExampleTest.php` to expect the 302 redirect from `/` instead of a 200.
 
 ### Step 7: Event form
 
