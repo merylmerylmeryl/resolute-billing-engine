@@ -23,13 +23,13 @@ class FeeCalculator
 
     private const STANDARD_RATE = '0.30';
 
-    private const VOLUME_RATE = '0.25';
+    public const VOLUME_RATE = '0.25';
 
-    private const VOLUME_RATE_MINIMUM_PROPERTIES = 3;
+    public const VOLUME_RATE_MINIMUM_PROPERTIES = 3;
 
-    private const WAIVER_THRESHOLD = '10.00';
+    public const WAIVER_THRESHOLD = '10.00';
 
-    private const FEE_CAP = '2500.00';
+    public const FEE_CAP = '2500.00';
 
     private const NO_FEE = '0.00';
 

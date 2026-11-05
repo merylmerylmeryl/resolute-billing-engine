@@ -44,6 +44,7 @@
 - **Re-imported homestead or jurisdiction changes:** affect future bills only. Exception: a property whose last revision didn't change the fee gets recalculated with the new data and can get one adjustment; documented, not fixed
 - **Bad import rows** (unknown property or jurisdiction, empty jurisdictions, negative or non-numeric values, invalid status or date, final with no value, a property moving to another client): skipped and reported, so one bad row doesn't block the rest
 - **Authentication:** none, since the spec doesn't ask for it
+- **Who the pages are for** Lone Oak staff (all clients, no login), with client-friendly labels so the page can be shared with a client
 
 ## How I checked it works
 
@@ -60,3 +61,4 @@
 - Rates and exemptions by year, so old invoices can always be reproduced, plus range checks if rates become editable
 - A season field from the case management system
 - Product questions for later: sending invoices, payments (Stripe?), notifications, logins, multiple users or owners per account
+- For a client-facing version I’d add names and addresses, hide event IDs, explain adjustments in a sentence, and format dates. The data model already supports it; it’s view work.
