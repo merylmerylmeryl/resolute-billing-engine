@@ -64,3 +64,4 @@
 - For a client-facing version I’d add names and addresses, hide event IDs, explain adjustments in a sentence, and format dates. The data model already supports it; it’s view work.
 - Searchable select for properties on Record Event page
 - Show recorded events on the client page, so a new event is visible before billing runs
+- Load-tested at 10,000 properties: hits PHP's default 128 MB memory limit. Fix: process in smaller chunks
