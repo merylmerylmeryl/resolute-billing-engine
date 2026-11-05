@@ -85,7 +85,7 @@ $212.88 -> $266.10 (+$53.22) -> $240.00 must give **-$26.10**, not +$27.12.
 - A client with only pending properties gets no invoice. A $0 invoice needs at least one line.
 - A client with both new and revised properties in one run gets one invoice and one adjustment. A mixed adjustment's total can be negative.
 - A backdated event, or a run with an older as-of date, never un-bills anything. If the eligible event isn't newer than the last billed one by (`recorded_at`, `id`), skip it.
-- **Import:** unreadable JSON or a missing top-level key aborts. A bad row (unknown property or jurisdiction, empty jurisdiction list, final with no value, pending with a value, invalid status or date, non-numeric or negative value, missing field, or a property row that moves the property to a different client) is skipped and reported, and the command exits non-zero, so one bad row doesn't block the rest.
+- **Import:** unreadable JSON or a missing top-level key aborts. A bad row (unknown property or jurisdiction, empty jurisdiction list, final with no value, pending with a value, invalid status or date, non-numeric or negative value, a value that won't fit `decimal(14,2)` (over 12 whole digits or 2 decimals), missing field, or a property row that moves the property to a different client) is skipped and reported, and the command exits non-zero, so one bad row doesn't block the rest.
 - A repeated `source_id` with different values: the first one wins, with a warning.
 - Re-importing changed homestead or jurisdiction data affects future calculations only and triggers no adjustment, with one exception: a revision that didn't change the fee never landed on a line (A4), so the next run recalculates it with the new data and issues one adjustment if the fee now differs.
 - **Form:** `recorded_at` can't be in the future, money has at most 2 decimals, and final value may exceed noticed (savings go negative, fee is $0). If noticed values differ across events, the latest event's value is used.
@@ -160,6 +160,7 @@ Apply the decisions above to CLAUDE.md, `docs/schema.md` and `docs/DECISIONS.md`
 - Jurisdictions: sync
 - Events: create only if `source_id` is new
 - Convert JSON numbers to strings here, the one place floats can enter
+- Convert integer IDs to strings, so a file with numeric IDs still loads and 101 and "101" are the same record
 - Reject a property with an empty `jurisdictions` list and an event with a negative value as bad rows, because the calculator throws on an empty list during billing and floors a negative value at $0
 - Prints a summary: created, updated, duplicates skipped, rows rejected
 

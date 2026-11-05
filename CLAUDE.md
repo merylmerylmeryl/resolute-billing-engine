@@ -65,8 +65,9 @@
 ## Import and form
 
 - Import keeps file order and never sorts, because "recorded last" depends on `id`.
+- Import converts integer IDs (`id`, `client_id`, `source_id`, `property_id`) to strings, so 101 and "101" are the same record.
 - Unreadable JSON or a missing top-level key aborts the import.
-- A bad row (unknown property or jurisdiction, empty jurisdiction list, final with no value, pending with a value, invalid status or date, non-numeric or negative value, missing field, or a property row that moves the property to a different client) is skipped and reported, valid rows still load, and the command exits non-zero.
+- A bad row (unknown property or jurisdiction, empty jurisdiction list, final with no value, pending with a value, invalid status or date, non-numeric or negative value, a value that won't fit `decimal(14,2)` (over 12 whole digits or 2 decimals), missing field, or a property row that moves the property to a different client) is skipped and reported, valid rows still load, and the command exits non-zero.
 - A repeated `source_id` with different values: the first one wins, with a warning.
 - Re-importing changed homestead or jurisdiction data affects future calculations only and triggers no adjustment, with one exception: a revision that didn't change the fee never landed on a line, so the next run recalculates it with the new data. If the fee now differs, that run issues one adjustment.
 - Form: `recorded_at` can't be in the future, money has at most 2 decimals, and final value may exceed noticed (savings go negative, fee is $0). If noticed values differ across events, the latest event's value is used.
