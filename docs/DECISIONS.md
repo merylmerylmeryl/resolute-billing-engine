@@ -14,7 +14,7 @@
 - CLAUDE.md with my rules (money as decimals, invoices never edited, etc.) so Claude Code followed them every session
 - Opus for plan and money and billing logic, Sonnet for pages, form, README to save usage
 - Plan Mode before coding, and approved each plan
-- Tests written first from the spec's expected results; a hook runs them automatically after every code change
+- Tests written first from the spec's expected results; a hook runs tests after every file Claude edits.
 - A review subagent checks changes against my rules before each commit
 - I reviewed every file and can explain all of it
 
