@@ -13,6 +13,7 @@ SQLite stores DECIMAL as REAL. Money attributes use `decimal:N` casts (which ret
 - external_id (unique) — e.g. "P1"
 - client_id (FK -> clients)
 - homestead (bool)
+- index (client_id)
 
 ## jurisdictions
 - id (PK)
@@ -26,6 +27,7 @@ SQLite stores DECIMAL as REAL. Money attributes use `decimal:N` casts (which ret
 - property_id (FK -> properties)
 - jurisdiction_id (FK -> jurisdictions)
 - unique (property_id, jurisdiction_id)
+- index (jurisdiction_id)
 
 ## events (append-only, never edited)
 - id (PK)
@@ -53,6 +55,7 @@ A run that issues nothing creates no row here.
 - type (enum: invoice, adjustment)
 - total (decimal 12,2) — can be negative on an adjustment
 - unique (run_id, client_id, type)
+- index (client_id)
 
 ## invoice_lines (never edited after issue)
 - id (PK)
@@ -71,5 +74,6 @@ A run that issues nothing creates no row here.
   - calculated fee before the waiver and cap
   - note: waived, capped or no_savings
   - per jurisdiction: rate, exemption, and taxable value and tax at both noticed and final values
+- index (invoice_id), index (property_id), index (adjusts_line_id)
 
 One line per property per season on each invoice is enforced in code and covered by a test, not by a constraint, because the season isn't stored. A property with unbilled events in two seasons gets two lines on one invoice.
